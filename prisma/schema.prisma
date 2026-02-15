@@ -1,0 +1,74 @@
+// Prisma schema for Vendor Discovery Platform
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Shortlist {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // User input
+  needDescription String
+  requirements    Json   // Array of requirement objects
+  
+  // Results
+  vendors         Vendor[]
+  
+  // Metadata
+  processingTime  Int?   // Time taken in milliseconds
+  status          String @default("pending") // pending, processing, completed, failed
+  errorMessage    String?
+  
+  @@index([createdAt])
+}
+
+model Vendor {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  
+  shortlistId String
+  shortlist   Shortlist @relation(fields: [shortlistId], references: [id], onDelete: Cascade)
+  
+  // Basic info
+  name        String
+  website     String
+  description String?
+  
+  // Pricing
+  priceRange  String?
+  pricingModel String?
+  currency    String   @default("USD")
+  
+  // Features & Analysis
+  keyFeatures      Json   // Array of features
+  matchedRequirements Json // Which requirements are met
+  risks            Json   // Array of risks/limitations
+  
+  // Evidence
+  evidenceLinks    Json   // Array of {url, snippet, relevance}
+  
+  // Scoring
+  overallScore     Float  @default(0.0)
+  requirementMatch Float  @default(0.0)
+  
+  @@index([shortlistId])
+  @@index([name])
+}
+
+model HealthCheck {
+  id          String   @id @default(cuid())
+  timestamp   DateTime @default(now())
+  service     String   // "database", "claude_api", "search_api"
+  status      String   // "healthy", "degraded", "down"
+  responseTime Int?    // milliseconds
+  errorMessage String?
+  
+  @@index([timestamp])
+  @@index([service])
+}

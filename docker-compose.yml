@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: vendor-discovery-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vendor_user
+      POSTGRES_PASSWORD: vendor_password
+      POSTGRES_DB: vendor_discovery
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vendor_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Next.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vendor-discovery-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database
+      DATABASE_URL: postgresql://vendor_user:vendor_password@postgres:5432/vendor_discovery
+      
+      # API Keys (replace with your keys)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY}
+      
+      # App Config
+      NODE_ENV: production
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      
+    ports:
+      - "3000:3000"
+    command: >
+      sh -c "
+        npx prisma db push &&
+        node server.js
+      "
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  default:
+    name: vendor-discovery-network
