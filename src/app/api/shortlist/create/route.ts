@@ -4,7 +4,6 @@ import { searchVendors } from '@/lib/search/serpapi'
 import { scrapeMultipleUrls } from '@/lib/scraper/scraper'
 import { analyzeVendors } from '@/lib/ai/gemini'
 import { Requirement } from '@/types'
-import { Prisma } from '@prisma/client'
 
 export const maxDuration = 60
 
@@ -28,7 +27,7 @@ export async function POST(request: NextRequest) {
     const shortlist = await prisma.shortlist.create({
       data: {
         needDescription: need,
-        requirements: requirements as Prisma.InputJsonValue,
+        requirements: requirements as unknown as any,  // ✅ Double cast
         status: 'processing',
       },
     })
@@ -85,9 +84,9 @@ export async function POST(request: NextRequest) {
             pricingModel: vendor.pricingModel,
             currency: vendor.currency,
             keyFeatures: vendor.keyFeatures,
-            matchedRequirements: vendor.matchedRequirements as Prisma.InputJsonValue,
+            matchedRequirements: vendor.matchedRequirements as unknown as any,  // ✅ Double cast
             risks: vendor.risks,
-            evidenceLinks: vendor.evidenceLinks as Prisma.InputJsonValue,
+            evidenceLinks: vendor.evidenceLinks as unknown as any,  // ✅ Double cast
             overallScore: vendor.overallScore,
             requirementMatch: vendor.requirementMatch,
           },
