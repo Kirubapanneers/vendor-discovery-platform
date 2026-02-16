@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { searchVendors } from '@/lib/search/serpapi'
 import { scrapeMultipleUrls } from '@/lib/scraper/scraper'
-import { analyzeVendors } from '@/lib/ai/gemini'  // ✅ Correct
+import { analyzeVendors } from '@/lib/ai/gemini'
 import { Requirement } from '@/types'
+import { Prisma } from '@prisma/client'
 
 export const maxDuration = 60
 
@@ -17,7 +18,6 @@ export async function POST(request: NextRequest) {
       requirements: Requirement[]
     }
 
-    // Validation
     if (!need || !requirements || requirements.length === 0) {
       return NextResponse.json(
         { error: 'Need and requirements are required' },
@@ -25,16 +25,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create pending shortlist
     const shortlist = await prisma.shortlist.create({
       data: {
         needDescription: need,
-        requirements: requirements,
+        requirements: requirements as Prisma.InputJsonValue,
         status: 'processing',
       },
     })
 
-    // Step 1: Search for vendors
     console.log('🔍 Searching for vendors...')
     const searchResults = await searchVendors(need, 10)
     
@@ -53,7 +51,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Step 2: Scrape top vendor websites
     console.log('🌐 Scraping vendor websites...')
     const urlsToScrape = searchResults.slice(0, 6).map(r => r.url)
     const scrapedData = await scrapeMultipleUrls(urlsToScrape)
@@ -73,11 +70,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Step 3: Analyze with Gemini AI
     console.log('🤖 Analyzing vendors with AI...')
     const vendorAnalysis = await analyzeVendors(need, requirements, scrapedData)
 
-    // Step 4: Save vendors to database
     const vendorRecords = await Promise.all(
       vendorAnalysis.map(vendor =>
         prisma.vendor.create({
@@ -90,9 +85,9 @@ export async function POST(request: NextRequest) {
             pricingModel: vendor.pricingModel,
             currency: vendor.currency,
             keyFeatures: vendor.keyFeatures,
-            matchedRequirements: vendor.matchedRequirements,
+            matchedRequirements: vendor.matchedRequirements as Prisma.InputJsonValue,
             risks: vendor.risks,
-            evidenceLinks: vendor.evidenceLinks,
+            evidenceLinks: vendor.evidenceLinks as Prisma.InputJsonValue,
             overallScore: vendor.overallScore,
             requirementMatch: vendor.requirementMatch,
           },
@@ -100,7 +95,6 @@ export async function POST(request: NextRequest) {
       )
     )
 
-    // Update shortlist status
     const processingTime = Date.now() - startTime
     const updatedShortlist = await prisma.shortlist.update({
       where: { id: shortlist.id },
@@ -117,7 +111,8 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    console.log(`✅ Shortlist created in ${processingTime}ms`) 
+    console.log(`✅ Shortlist created in ${processingTime}ms`)
+
     return NextResponse.json({
       success: true,
       shortlist: updatedShortlist,
@@ -136,4 +131,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-
